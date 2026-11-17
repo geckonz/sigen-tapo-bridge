@@ -1,6 +1,6 @@
 # TP-Link Tapo P110M to Sigenergy (mySigen) Bridge
 
-A lightweight `asyncio` Python bridge designed to run on a Raspberry Pi (including older models like the **Raspberry Pi 2 Model B**). It polls TP-Link Tapo P110M smart plugs locally via `python-kasa` and emulates native **Shelly Plus 1PM** (Gen2+) devices over mDNS and HTTP JSON-RPC so the Sigenergy Gateway discovers and monitors each appliance inside the **mySigen** app.
+A lightweight `asyncio` Python bridge designed to run on a Raspberry Pi (including older models like the **Raspberry Pi Model B**). It polls TP-Link Tapo P110M smart plugs locally via `python-kasa` and emulates native **Shelly Plus 1PM** (Gen2+) devices over mDNS and HTTP JSON-RPC so the Sigenergy Gateway discovers and monitors each appliance inside the **mySigen** app.
 
 ---
 

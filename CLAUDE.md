@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Purpose
 
-Single-file asyncio bridge (`bridge.py`) that polls TP-Link Tapo P110M smart plugs locally via `python-kasa` and makes each one appear on the LAN as a **Shelly Plus 1PM (Gen2)** device, so a Sigenergy Gateway discovers it and the mySigen app can meter and switch it. It is deployed on a Raspberry Pi 1 Model B (armv6l, ~430 MB RAM), where python-kasa's KLAP encryption is CPU-expensive, so keep it lightweight. Full deployment steps are in `sigen_tapo_bridge_setup_guide.md`.
+Single-file asyncio bridge (`bridge.py`) that polls TP-Link Tapo P110M smart plugs locally via `python-kasa` and makes each one appear on the LAN as a **Shelly Plus 1PM (Gen2)** device, so a Sigenergy Gateway discovers it and the mySigen app can meter and switch it. It is deployed on a Raspberry Pi 1 Model B (armv6l, ~430 MB RAM), where python-kasa's KLAP encryption is CPU-expensive, so keep it lightweight. Full deployment steps are in `README.md`.
 
 ## Commands
 
