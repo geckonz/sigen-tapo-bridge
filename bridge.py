@@ -159,12 +159,14 @@ class TapoShellyNode:
         password: str,
         poll_interval: float,
         log_requests: bool = False,
+        wifi_ssid: str = "LocalLAN",
     ):
         self.state = state
         self.username = username
         self.password = password
         self.poll_interval = poll_interval
         self.log_requests = log_requests
+        self.wifi_ssid = wifi_ssid
         self.meter = EnergyMeter(state, max_gap_seconds=poll_interval * 4 + 10)
         self.runner: Optional[web.AppRunner] = None
         self.aiozc: Optional[AsyncZeroconf] = None
@@ -172,6 +174,7 @@ class TapoShellyNode:
         self._stop_event = asyncio.Event()
         self._device_config: Optional[DeviceConfig] = None  # Cached after first discovery
         self._failures = 0
+        self._poll_task: Optional[asyncio.Task] = None
 
     async def _sleep(self, seconds: float) -> bool:
         """Wait for the given time; return True if the node is stopping."""
@@ -320,11 +323,16 @@ class TapoShellyNode:
             "temperature": {"tC": 38.5, "tF": 101.3},
         }
 
+    @staticmethod
+    def _input_status() -> Dict[str, Any]:
+        # The Tapo plug has no physical switch input; report it as permanently open.
+        return {"id": 0, "state": False}
+
     def _full_status(self) -> Dict[str, Any]:
         return {
             "ble": {},
             "cloud": {"connected": False},
-            "input:0": {"id": 0, "state": False},
+            "input:0": self._input_status(),
             "switch:0": self._switch_status(),
             "sys": {
                 "mac": self.state.virtual_mac.upper(),
@@ -342,7 +350,7 @@ class TapoShellyNode:
             "wifi": {
                 "sta_ip": self.state.virtual_shelly_ip,
                 "status": "got ip",
-                "ssid": "LocalLAN",
+                "ssid": self.wifi_ssid,
                 "rssi": -50,
             },
         }
@@ -370,34 +378,39 @@ class TapoShellyNode:
         return {"was_on": was_on}
 
     async def _dispatch_rpc(self, method: str, params: Dict[str, Any]) -> Dict[str, Any]:
-        if method == "Shelly.GetDeviceInfo":
+        # Clients don't agree on casing (mySigen sends "WiFi.GetStatus"), so match case-insensitively.
+        name = method.lower()
+        if name == "shelly.getdeviceinfo":
             return self._device_info()
-        if method == "Shelly.GetStatus":
+        if name == "shelly.getstatus":
             return self._full_status()
-        if method == "Shelly.GetConfig":
+        if name == "shelly.getconfig":
             return {
                 "sys": {"device": {"name": self.state.name, "mac": self.state.virtual_mac.upper()}},
                 "switch:0": {"id": 0, "name": self.state.name, "initial_state": "restore_last"},
             }
-        if method == "Switch.GetStatus":
+        if name == "switch.getstatus":
             self._check_switch_id(params)
             return self._switch_status()
-        if method == "Switch.Set":
+        if name == "switch.set":
             self._check_switch_id(params)
             if "on" not in params:
                 raise RpcError(ERR_INVALID_ARGUMENT, "Missing required 'on'")
             return await self._set_switch(_as_bool(params["on"]))
-        if method == "Switch.Toggle":
+        if name == "switch.toggle":
             self._check_switch_id(params)
             return await self._set_switch(not self.state.is_on)
-        if method == "Sys.SetConfig":
+        if name == "input.getstatus":
+            self._check_switch_id(params)
+            return self._input_status()
+        if name == "sys.setconfig":
             new_name = params.get("config", {}).get("device", {}).get("name")
             if new_name:
                 self.state.name = new_name
             return {"restart_required": False}
-        if method == "Sys.GetStatus":
+        if name == "sys.getstatus":
             return self._full_status()["sys"]
-        if method == "Wifi.GetStatus":
+        if name == "wifi.getstatus":
             return self._full_status()["wifi"]
 
         raise RpcError(ERR_NO_HANDLER, f"No handler for {method}", 404)
@@ -529,7 +542,8 @@ class TapoShellyNode:
 
     async def run(self) -> None:
         """Serve the emulated Shelly and poll the Tapo plug independently of other nodes."""
-        await asyncio.gather(self._start_with_retry(), self.poll_loop())
+        self._poll_task = asyncio.create_task(self.poll_loop())
+        await asyncio.gather(self._start_with_retry(), self._poll_task)
 
     async def _shutdown_server(self) -> None:
         if self.aiozc:
@@ -547,6 +561,15 @@ class TapoShellyNode:
 
     async def stop(self) -> None:
         self._stop_event.set()
+        # Let an in-flight poll finish before disconnecting: python-kasa lazily opens a new
+        # aiohttp session on its next request, so disconnecting mid-update leaks a session.
+        if self._poll_task is not None:
+            try:
+                await asyncio.wait_for(self._poll_task, timeout=15)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                log.warning("[%s] Poll loop did not stop in time; cancelled", self.state.name)
+            except Exception as exc:
+                log.debug("Poll loop ended with error: %s", exc)
         await self._shutdown_server()
         if self.state.device is not None:
             await self._safe_disconnect(self.state.device)
@@ -575,6 +598,7 @@ async def main() -> None:
     password = cfg["tapo_password"]
     poll_interval = float(cfg.get("poll_interval_seconds", 3.0))
     log_requests = bool(cfg.get("log_requests", False))
+    wifi_ssid = str(cfg.get("wifi_ssid", "LocalLAN"))  # Reported in Wifi.GetStatus; set to the real network name
 
     store = StateStore(BASE_DIR / cfg.get("state_file", "state.json"))
     saved = store.load()
@@ -588,7 +612,7 @@ async def main() -> None:
             virtual_mac=entry["virtual_mac"],
         )
         state.aenergy_total_wh = float(saved.get(state.virtual_mac.upper(), {}).get("aenergy_total_wh", 0.0))
-        nodes.append(TapoShellyNode(state, username, password, poll_interval, log_requests))
+        nodes.append(TapoShellyNode(state, username, password, poll_interval, log_requests, wifi_ssid))
 
     states = [n.state for n in nodes]
     stop_event = asyncio.Event()
@@ -609,8 +633,7 @@ async def main() -> None:
 
     await stop_event.wait()
     log.info("Shutting down Sigen-Tapo bridge...")
-    for n in nodes:
-        await n.stop()
+    await asyncio.gather(*(n.stop() for n in nodes))
     await asyncio.gather(*tasks, return_exceptions=True)
     store.save(states)
 

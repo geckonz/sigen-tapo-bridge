@@ -3,6 +3,7 @@
   "tapo_password": "your-tplink-password",
   "poll_interval_seconds": 3,
   "log_requests": false,
+  "wifi_ssid": "your-iot-wifi-name",
   "state_file": "state.json",
   "plugs": [
     {
