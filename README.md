@@ -17,6 +17,8 @@ A lightweight `asyncio` Python bridge designed to run on a Raspberry Pi (includi
 
 The Sigenergy Gateway expects one unique IP address on port `80` per Shelly device. Assign a secondary virtual IP alias to your Pi's Ethernet interface (`eth0`) for each Tapo plug you want to bridge.
 
+> **Note:** The interface is usually `eth0`, but some systems use a predictable name instead (e.g. `enxb827eb36cba3` on a Pi Model B). Check yours with `ip -br addr` and substitute it wherever `eth0` appears below.
+
 Assuming your Pi's primary IP is `192.168.1.200/24`:
 
 ```bash
