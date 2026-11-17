@@ -27,4 +27,4 @@ There is no build system, test suite, or linter configured. Dependencies: `pip i
 
 ## Config constraints
 
-`config.json` holds the TP-Link account credentials, which python-kasa uses for local auth (the "Third-Party Compatibility" setting must be enabled in the Tapo app). Each plug entry needs a unique `virtual_shelly_ip` and a unique 12-character uppercase hex `virtual_mac` with no colons. The checked-in `config.json` contains placeholder values only.
+`config.json` holds the TP-Link account credentials, which python-kasa uses for local auth (the "Third-Party Compatibility" setting must be enabled in the Tapo app). Each plug entry needs a unique `virtual_shelly_ip` and a unique 12-character uppercase hex `virtual_mac` with no colons. `config.json` is gitignored; the repo only tracks `config.example.json` (placeholder values), which is copied to `config.json` for real use.

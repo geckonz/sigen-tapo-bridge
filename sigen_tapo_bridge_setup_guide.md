@@ -58,7 +58,13 @@ chmod +x /opt/sigen-tapo-bridge/bridge.py
 
 ## 3. Create `config.json`
 
-Create `/opt/sigen-tapo-bridge/config.json` with your TP-Link account credentials (used by `python-kasa` for local session authentication) and your plug mappings:
+Copy `config.example.json` to `/opt/sigen-tapo-bridge/config.json` and fill in your TP-Link account credentials (used by `python-kasa` for local session authentication) and your plug mappings. `config.json` is gitignored so your credentials are never committed:
+
+```bash
+cp config.example.json /opt/sigen-tapo-bridge/config.json
+```
+
+Example contents:
 
 ```json
 {

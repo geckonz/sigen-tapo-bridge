@@ -221,3 +221,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local config with real Tapo credentials (copy from config.example.json)
+config.json
