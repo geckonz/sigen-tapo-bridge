@@ -41,6 +41,7 @@ SHELLY_FW_ID = "20241011-114455/1.4.4-g6d2a586"
 MAX_BACKOFF_SECONDS = 60.0
 BIND_RETRY_SECONDS = 30.0
 STATE_SAVE_INTERVAL_SECONDS = 300.0
+MDNS_PORT = 5353
 
 # Shelly Gen2 RPC error codes (https://shelly-api-docs.shelly.cloud/gen2/General/CommonErrors/)
 ERR_INVALID_ARGUMENT = -103
@@ -527,6 +528,7 @@ class TapoShellyNode:
         }
 
         self.aiozc = AsyncZeroconf(interfaces=[self.state.virtual_shelly_ip], ip_version=IPVersion.V4Only)
+        self._pin_unicast_replies(self.aiozc.zeroconf, self.state.virtual_shelly_ip)
         self.services = [
             ServiceInfo(
                 service_type,
@@ -548,6 +550,29 @@ class TapoShellyNode:
             self.state.virtual_shelly_ip,
             self.state.tapo_ip,
         )
+
+    @staticmethod
+    def _pin_unicast_replies(zc: Any, ip: str) -> None:
+        """Send direct (legacy unicast) mDNS replies from this node's own IP.
+
+        zeroconf answers unicast queries through its shared 0.0.0.0 listen socket, so the kernel
+        stamps every node's reply with the NIC's first address. mySigen's phone app queries this
+        way and keys devices by reply source IP, so it only listed one of the virtual Shellys.
+        Route those replies through this node's IP-bound respond socket instead. This relies on
+        zeroconf internals (Zeroconf.async_send, engine.senders); if they change, the original
+        behaviour is kept.
+        """
+        original = zc.async_send
+
+        def async_send(out, addr=None, port=MDNS_PORT, v6_flow_scope=(), transport=None):
+            if addr is not None:
+                for sender in getattr(zc.engine, "senders", ()):
+                    if sender.sock_name and sender.sock_name[0] == ip:
+                        transport = sender
+                        break
+            original(out, addr, port, v6_flow_scope, transport)
+
+        zc.async_send = async_send
 
     async def _start_with_retry(self) -> None:
         while not self._stop_event.is_set():

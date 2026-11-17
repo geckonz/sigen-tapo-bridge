@@ -25,13 +25,18 @@ Assuming your Pi's primary IP is `192.168.1.200/24`:
 # Check your active Ethernet connection name (usually "Wired connection 1")
 nmcli connection show
 
-# Add one virtual IP per Tapo plug (e.g., .201 and .202)
-sudo nmcli connection modify "Wired connection 1" +ipv4.addresses "192.168.1.201/24,192.168.1.202/24"
+# Add one virtual IP per Tapo plug (e.g., .201 and .202) as single-host /32 addresses
+sudo nmcli connection modify "Wired connection 1" +ipv4.addresses "192.168.1.201/32,192.168.1.202/32"
 sudo nmcli connection up "Wired connection 1"
 
 # Verify the virtual IPs are active on eth0
 ip -4 addr show eth0
+
+# Verify there is a single subnet route and it uses the primary IP (src 192.168.1.200)
+ip route
 ```
+
+> **Why `/32`?** Adding the aliases as `/24` gives each one its own subnet route, and the kernel then uses the first alias (e.g. `.201`) as the source address for all of the Pi's local traffic. As `/32` addresses they add no routes, so the Pi keeps using its primary IP while the bridge still binds each virtual Shelly to its own alias.
 
 ---
 
