@@ -1,0 +1,15 @@
+[Unit]
+Description=TP-Link Tapo P110M to Sigenergy Shelly Gen2 Bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/sigen-tapo-bridge
+ExecStart=/opt/sigen-tapo-bridge/venv/bin/python /opt/sigen-tapo-bridge/bridge.py
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target

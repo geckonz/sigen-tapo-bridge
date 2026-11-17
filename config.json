@@ -1,0 +1,19 @@
+{
+  "tapo_username": "your-tplink-email@example.com",
+  "tapo_password": "your-tplink-password",
+  "poll_interval_seconds": 3,
+  "plugs": [
+    {
+      "name": "Kitchen Fridge",
+      "tapo_ip": "192.168.1.51",
+      "virtual_shelly_ip": "192.168.1.201",
+      "virtual_mac": "A8032A110001"
+    },
+    {
+      "name": "Office Desk",
+      "tapo_ip": "192.168.1.52",
+      "virtual_shelly_ip": "192.168.1.202",
+      "virtual_mac": "A8032A110002"
+    }
+  ]
+}
