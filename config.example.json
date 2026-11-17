@@ -2,6 +2,8 @@
   "tapo_username": "your-tplink-email@example.com",
   "tapo_password": "your-tplink-password",
   "poll_interval_seconds": 3,
+  "log_requests": false,
+  "state_file": "state.json",
   "plugs": [
     {
       "name": "Kitchen Fridge",

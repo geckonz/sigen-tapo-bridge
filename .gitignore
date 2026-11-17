@@ -224,3 +224,7 @@ __marimo__/
 
 # Local config with real Tapo credentials (copy from config.example.json)
 config.json
+
+# Persisted energy totals written by the bridge
+state.json
+state.json.tmp
