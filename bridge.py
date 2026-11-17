@@ -175,6 +175,7 @@ class TapoShellyNode:
         self._device_config: Optional[DeviceConfig] = None  # Cached after first discovery
         self._failures = 0
         self._poll_task: Optional[asyncio.Task] = None
+        self._reported_errors: set[tuple[str, str, int]] = set()
 
     async def _sleep(self, seconds: float) -> bool:
         """Wait for the given time; return True if the node is stopping."""
@@ -429,6 +430,24 @@ class TapoShellyNode:
                 params,
             )
 
+    def _log_rpc_error(self, request: web.Request, method: str, params: Any, err: RpcError) -> None:
+        """Always log failed calls (e.g. methods we don't implement yet), once per client/method/code."""
+        key = (str(request.remote), method.lower(), err.code)
+        if key in self._reported_errors:
+            return
+        self._reported_errors.add(key)
+        log.warning(
+            "[%s] %s %s %s method=%s params=%s -> error %s: %s (repeats from this client not logged)",
+            self.state.name,
+            request.remote,
+            request.method,
+            request.path,
+            method,
+            params,
+            err.code,
+            err.message,
+        )
+
     async def handle_shelly_info(self, request: web.Request) -> web.Response:
         self._log_request(request, "/shelly", {})
         return web.json_response(self._device_info())
@@ -440,13 +459,16 @@ class TapoShellyNode:
             try:
                 body = await request.json()
             except Exception:
-                return web.json_response({"code": ERR_INVALID_ARGUMENT, "message": "Invalid JSON body"}, status=400)
+                err = RpcError(ERR_INVALID_ARGUMENT, "Invalid JSON body")
+                self._log_rpc_error(request, method, params, err)
+                return web.json_response({"code": err.code, "message": err.message}, status=err.http_status)
             if isinstance(body, dict):
                 params.update(body.get("params", body))
         self._log_request(request, method, params)
         try:
             result = await self._dispatch_rpc(method, params)
         except RpcError as err:
+            self._log_rpc_error(request, method, params, err)
             return web.json_response({"code": err.code, "message": err.message}, status=err.http_status)
         return web.json_response(result)
 
@@ -457,7 +479,9 @@ class TapoShellyNode:
             if not isinstance(data, dict):
                 raise ValueError("request frame must be a JSON object")
         except Exception as exc:
-            frame["error"] = {"code": ERR_INVALID_ARGUMENT, "message": f"Invalid request frame: {exc}"}
+            err = RpcError(ERR_INVALID_ARGUMENT, f"Invalid request frame: {exc}")
+            self._log_rpc_error(request, "<invalid frame>", {}, err)
+            frame["error"] = {"code": err.code, "message": err.message}
             return web.json_response(frame, status=400)
 
         frame["id"] = data.get("id")
@@ -471,6 +495,7 @@ class TapoShellyNode:
                 raise RpcError(ERR_INVALID_ARGUMENT, "params must be an object")
             frame["result"] = await self._dispatch_rpc(method, params)
         except RpcError as err:
+            self._log_rpc_error(request, method, params, err)
             frame["error"] = {"code": err.code, "message": err.message}
         return web.json_response(frame)
 

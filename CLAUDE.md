@@ -13,7 +13,7 @@ There is no build system, test suite, or linter configured. Dependencies: `pip i
 - Run: `python bridge.py` (reads `config.json` from the script's own directory). It must run as root, or with `CAP_NET_BIND_SERVICE`, because it binds port 80. Every `virtual_shelly_ip` must be assigned to a local interface; a node whose IP isn't available yet logs an error and retries every 30 s without affecting the other nodes.
 - Exercise the emulated device: `curl http://<virtual_shelly_ip>/rpc/Shelly.GetStatus`, `curl http://<ip>/shelly`, `curl "http://<ip>/rpc/Switch.Set?id=0&on=true"`, or POST JSON-RPC `{"id":1,"src":"me","method":"Switch.GetStatus","params":{"id":0}}` to `/rpc`.
 - Set `"wifi_ssid"` to the real Wi-Fi network name; it is reported in `Wifi.GetStatus`, which mySigen calls when adding a device.
-- Set `"log_requests": true` in `config.json` to log every incoming HTTP request (source IP, path, method, params). Use it to see what curl or the Sigenergy Gateway actually calls.
+- Failed RPC calls (unknown methods, bad arguments, plug unreachable) are always logged as warnings, once per client/method/error code, so new methods the SigenStor starts calling show up as "No handler for ...". Set `"log_requests": true` to also log every successful request; leave it off in normal use, since the SigenStor (192.168.2.138) polls each paired plug about once a second.
 - Deployed service: `sigen-tapo-bridge.service` expects the code at `/opt/sigen-tapo-bridge` with a venv at `/opt/sigen-tapo-bridge/venv`. Logs: `journalctl -u sigen-tapo-bridge.service -f`.
 
 ## Architecture
